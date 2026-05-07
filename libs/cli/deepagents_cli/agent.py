@@ -1225,9 +1225,22 @@ def create_cli_agent(
     # Tool retrieval rewrites call_retrieved_tool into the selected native tool
     # before shell allow-list and HITL middleware evaluate the call.
     if not no_retrieval_tool_call:
+        from deepagents.middleware.filesystem import FilesystemMiddleware
+        from langchain.agents.middleware import TodoListMiddleware
+
         from deepagents_cli.tool_retrieval import ToolRetrievalMiddleware
 
-        agent_middleware.append(ToolRetrievalMiddleware(platform="cli"))
+        retrieval_fallback_tools = [
+            *TodoListMiddleware().tools,
+            *FilesystemMiddleware(backend=backend).tools,
+            *tools,
+        ]
+        agent_middleware.append(
+            ToolRetrievalMiddleware(
+                platform="cli",
+                fallback_tools=retrieval_fallback_tools,
+            )
+        )
 
     # Add shell allow-list middleware when interrupt_shell_only is active.
     shell_middleware_added = False

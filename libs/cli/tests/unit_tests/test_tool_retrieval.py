@@ -179,6 +179,45 @@ def test_prepare_request_hides_native_tools_and_adds_guidance() -> None:
     assert "Tool retrieval is enabled" in modified.system_prompt
 
 
+def test_prepare_request_uses_fallback_catalog_when_visible_tools_are_helpers() -> None:
+    """Middleware ordering can expose only helper tools in `request.tools`."""
+    native_tool = StructuredTool.from_function(
+        _read_file, name="read_file", description="Read a file"
+    )
+    second_tool = StructuredTool.from_function(
+        _echo_value, name="echo_value", description="Echo a value"
+    )
+
+    middleware = ToolRetrievalMiddleware(
+        config={"top_k": 1},
+        fallback_tools=[native_tool, second_tool],
+        load_index_fn=lambda *_args, **_kwargs: ToolRetrievalIndex(
+            index=object(),
+            metadata={},
+            entries=[{"name": "read_file"}, {"name": "echo_value"}],
+            vector_dimensions=2,
+            index_path=Path("/tmp/index.faiss"),
+            metadata_path=Path("/tmp/index.meta.json"),
+        ),
+    )
+    request = SimpleNamespace(
+        tools=list(middleware.tools),
+        runtime=SimpleNamespace(config={"configurable": {"thread_id": "thread-1"}}),
+        messages=[HumanMessage("read a file", id="user-1")],
+        system_prompt="Base prompt",
+        override=lambda **kwargs: SimpleNamespace(**{**request.__dict__, **kwargs}),
+    )
+
+    modified = middleware._prepare_request(request)
+    state = middleware._states["thread-1"]
+
+    assert [tool.name for tool in modified.tools] == [
+        "retrieve_tools",
+        "call_retrieved_tool",
+    ]
+    assert sorted(state.records_by_name) == ["echo_value", "read_file"]
+
+
 def test_retrieve_failure_returns_error_and_clears_state() -> None:
     def fail_select(*_args: object, **_kwargs: object) -> ToolRetrievalResult:
         msg = "embedding failed"

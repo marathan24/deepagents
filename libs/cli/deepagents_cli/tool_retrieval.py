@@ -1017,6 +1017,7 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         *,
         config: dict[str, Any] | None = None,
         platform: str = DEFAULT_PLATFORM,
+        fallback_tools: Sequence[BaseTool | Callable | dict[str, Any]] | None = None,
         select_fn: Callable[..., ToolRetrievalResult] = select_tools_for_query,
         load_index_fn: Callable[..., ToolRetrievalIndex] = load_or_build_index,
     ) -> None:
@@ -1025,6 +1026,8 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         Args:
             config: Retrieval configuration. Missing values use Hermes defaults.
             platform: Cache namespace for index artifacts.
+            fallback_tools: Native tool catalog used when middleware ordering
+                exposes only retrieval helpers in `request.tools`.
             select_fn: Retrieval function, injectable for tests.
             load_index_fn: Index loading function, injectable for tests.
         """
@@ -1035,6 +1038,7 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         self.config = merged
         self.platform = platform
         self.tools = [_make_retrieve_tools_tool(), _make_call_retrieved_tool()]
+        self.fallback_tools = list(fallback_tools or [])
         self._select_fn = select_fn
         self._load_index_fn = load_index_fn
         self._states: dict[str, _ThreadRetrievalState] = {}
@@ -1075,6 +1079,8 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         self, request: ModelRequest[ContextT]
     ) -> ModelRequest[ContextT]:
         records = _tool_records(request.tools or [])
+        if not records and self.fallback_tools:
+            records = _tool_records(self.fallback_tools)
         if not records:
             return request.override(tools=[])
         if len(records) <= _top_k(self.config):
