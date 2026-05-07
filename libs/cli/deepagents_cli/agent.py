@@ -68,6 +68,7 @@ from deepagents_cli.local_context import (
     _AsyncExecutableBackend,
     _ExecutableBackend,
 )
+from deepagents_cli.openrouter_compat import OpenRouterReasoningCompatibilityMiddleware
 from deepagents_cli.project_utils import ProjectContext, get_server_project_context
 from deepagents_cli.remote_content import RemoteContentCompatibilityMiddleware
 from deepagents_cli.subagents import list_subagents
@@ -1103,7 +1104,12 @@ def create_cli_agent(
 
     # Build middleware stack based on enabled features
     agent_middleware = []
-    agent_middleware.append(ConfigurableModelMiddleware())
+    agent_middleware.extend(
+        [
+            ConfigurableModelMiddleware(),
+            OpenRouterReasoningCompatibilityMiddleware(),
+        ]
+    )
 
     # Token state: adds _context_tokens to graph state (checkpointed, not
     # passed to model).  Must be registered before any middleware that might
