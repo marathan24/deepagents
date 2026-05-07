@@ -258,6 +258,48 @@ def test_retrieve_failure_returns_error_and_clears_state() -> None:
     assert state.retrieved_names == []
 
 
+def test_retrieve_tools_uses_fallback_catalog_when_state_is_empty() -> None:
+    """Tool calls may run on a fresh middleware state in the server runtime."""
+    native_tool = StructuredTool.from_function(
+        _read_file, name="read_file", description="Read a file"
+    )
+
+    def select(
+        _tools: list[dict[str, object]],
+        _query: str,
+        _config: dict[str, object],
+        **_kwargs: object,
+    ) -> ToolRetrievalResult:
+        return ToolRetrievalResult(
+            selected_tools=[],
+            selected_names=["read_file"],
+            scores={"read_file": 0.9},
+        )
+
+    middleware = ToolRetrievalMiddleware(
+        fallback_tools=[native_tool],
+        select_fn=select,
+        load_index_fn=lambda *_args, **_kwargs: ToolRetrievalIndex(
+            index=object(),
+            metadata={},
+            entries=[{"name": "read_file"}],
+            vector_dimensions=2,
+            index_path=Path("/tmp/index.faiss"),
+            metadata_path=Path("/tmp/index.meta.json"),
+        ),
+    )
+    request = _tool_request("retrieve_tools", {"query": "read files"})
+
+    result = middleware.wrap_tool_call(
+        request, lambda _request: pytest.fail("handler should not run")
+    )
+    payload = json.loads(result.content)
+
+    assert payload["success"] is True
+    assert payload["retrieved_tools"] == ["read_file"]
+    assert "read_file" in middleware._states["thread-1"].records_by_name
+
+
 def test_call_retrieved_tool_dispatches_only_latest_retrieved_tool() -> None:
     native_tool = StructuredTool.from_function(
         _echo_value, name="echo_value", description="Echo a value"

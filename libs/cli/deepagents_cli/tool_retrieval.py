@@ -1054,6 +1054,10 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
                 self._states[thread_key] = state
             return state
 
+    def _fallback_records_by_name(self) -> dict[str, _ToolRecord]:
+        records = _tool_records(self.fallback_tools)
+        return {record.name: record for record in records}
+
     def _ensure_index(self, records: Sequence[_ToolRecord]) -> ToolRetrievalIndex:
         schemas = [record.schema for record in records]
         schema_hash = tool_schema_hash(schemas)
@@ -1183,6 +1187,10 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
             )
 
         records_by_name = state.records_by_name or {}
+        if not records_by_name and self.fallback_tools:
+            records_by_name = self._fallback_records_by_name()
+            with self._lock:
+                state.records_by_name = records_by_name
         records = list(records_by_name.values())
         if not records:
             return self._tool_message(
@@ -1359,7 +1367,13 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
                 ),
             )
 
-        record = (state.records_by_name or {}).get(requested_name)
+        records_by_name = state.records_by_name or {}
+        if not records_by_name and self.fallback_tools:
+            records_by_name = self._fallback_records_by_name()
+            with self._lock:
+                state.records_by_name = records_by_name
+
+        record = records_by_name.get(requested_name)
         if record is None:
             return (
                 None,
