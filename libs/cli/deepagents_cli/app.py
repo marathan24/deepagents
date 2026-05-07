@@ -587,7 +587,7 @@ class TextualSessionState:
 _COMMAND_URLS: dict[str, str] = {
     "/changelog": CHANGELOG_URL,
     "/docs": DOCS_URL,
-    "/feedback": "https://github.com/langchain-ai/deepagents/issues/new/choose",
+    "/feedback": "https://github.com/marathan24/deepagents/issues/new/choose",
 }
 """Slash-command to URL mapping for commands that just open a browser."""
 
@@ -6940,7 +6940,13 @@ class DeepAgentsApp(App):
             latest="9.9.9",
             cli_version="0.0.1",
             age_suffix=", released 2 days ago",
-            upgrade_cmd="uv tool upgrade deepagents-cli",
+            upgrade_cmd=(
+                "uv tool install -U "
+                '--with "deepagents @ git+https://github.com/marathan24/'
+                'deepagents.git@main#subdirectory=libs/deepagents" '
+                '"deepagents-cli @ git+https://github.com/marathan24/'
+                'deepagents.git@main#subdirectory=libs/cli"'
+            ),
         )
         self._notice_registry.add(update_notification)
         self._update_modal_pending.set()

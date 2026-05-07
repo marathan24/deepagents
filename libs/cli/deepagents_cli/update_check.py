@@ -63,7 +63,15 @@ _SDK_RELEASE_TIMES_KEY = "sdk_release_times"
 
 InstallMethod = Literal["uv", "pip", "brew", "unknown"]
 
-FALLBACK_UPGRADE_COMMAND = "pip install --upgrade deepagents-cli"
+FORK_REPO_SPEC = "git+https://github.com/marathan24/deepagents.git@main"
+"""Default fork source used by upgrade commands."""
+
+FALLBACK_UPGRADE_COMMAND = (
+    "curl -LsSf "
+    "https://raw.githubusercontent.com/marathan24/deepagents/main/libs/cli/"
+    "scripts/install.sh "
+    "| bash"
+)
 """Generic upgrade hint used when install-method detection fails.
 
 Callers that surface an upgrade command in user-facing text should prefer
@@ -72,8 +80,12 @@ to render when detection raises unexpectedly.
 """
 
 _UPGRADE_COMMANDS: dict[InstallMethod, str] = {
-    "uv": "uv tool upgrade deepagents-cli",
-    "brew": "brew upgrade deepagents-cli",
+    "uv": (
+        "uv tool install -U "
+        f'--with "deepagents @ {FORK_REPO_SPEC}#subdirectory=libs/deepagents" '
+        f'"deepagents-cli @ {FORK_REPO_SPEC}#subdirectory=libs/cli"'
+    ),
+    "brew": FALLBACK_UPGRADE_COMMAND,
     "pip": FALLBACK_UPGRADE_COMMAND,
 }
 """Upgrade commands keyed by install method.

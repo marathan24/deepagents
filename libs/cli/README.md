@@ -6,26 +6,27 @@
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/langchain_oss.svg?style=social&label=Follow%20%40LangChain)](https://x.com/langchain_oss)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/langchain-ai/deepagents/main/libs/cli/images/cli.png" alt="Deep Agents CLI" width="600"/>
+  <img src="https://raw.githubusercontent.com/marathan24/deepagents/main/libs/cli/images/cli.png" alt="Deep Agents CLI" width="600"/>
 </p>
 
 ## Quick Install
 
 ```bash
-curl -LsSf https://langch.in/gh-da-cli | bash
+curl -LsSf https://raw.githubusercontent.com/marathan24/deepagents/main/libs/cli/scripts/install.sh | bash
 ```
 
 ```bash
 # With model provider extras
 # OpenAI, Anthropic, and Gemini are included by default
-DEEPAGENTS_EXTRAS="nvidia,ollama" curl -LsSf https://langch.in/gh-da-cli | bash
+DEEPAGENTS_EXTRAS="nvidia,ollama" curl -LsSf https://raw.githubusercontent.com/marathan24/deepagents/main/libs/cli/scripts/install.sh | bash
 ```
 
 Or install directly with `uv`:
 
 ```bash
 # Install with chosen model providers
-uv tool install 'deepagents-cli[nvidia,ollama]'
+uv tool install --with 'deepagents @ git+https://github.com/marathan24/deepagents.git@main#subdirectory=libs/deepagents' \
+  'deepagents-cli[nvidia,ollama] @ git+https://github.com/marathan24/deepagents.git@main#subdirectory=libs/cli'
 ```
 
 Run the CLI:
@@ -52,9 +53,9 @@ The fastest way to start using Deep Agents. `deepagents-cli` is a pre-built codi
 ## 📖 Resources
 
 - **[CLI Documentation](https://docs.langchain.com/oss/python/deepagents/cli/overview)**
-- **[Changelog](https://github.com/langchain-ai/deepagents/blob/main/libs/cli/CHANGELOG.md)**
-- **[Source code](https://github.com/langchain-ai/deepagents/tree/main/libs/cli)**
-- **[Deep Agents SDK](https://github.com/langchain-ai/deepagents)** — underlying agent harness
+- **[Changelog](https://github.com/marathan24/deepagents/blob/main/libs/cli/CHANGELOG.md)**
+- **[Source code](https://github.com/marathan24/deepagents/tree/main/libs/cli)**
+- **[Deep Agents SDK](https://github.com/marathan24/deepagents)** — underlying agent harness
 
 ## 📕 Releases & Versioning
 

@@ -30,7 +30,7 @@ OPENROUTER_MIN_VERSION = "0.2.0"  # app attribution support added
 Used to enforce a consistent version floor at runtime.
 """
 
-_OPENROUTER_APP_URL = "https://github.com/langchain-ai/deepagents"
+_OPENROUTER_APP_URL = "https://github.com/marathan24/deepagents"
 """Default `app_url` (maps to `HTTP-Referer`) for OpenRouter attribution.
 
 See https://openrouter.ai/docs/app-attribution for details.

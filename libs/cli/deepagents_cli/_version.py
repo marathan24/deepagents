@@ -16,7 +16,7 @@ performs SDK update checks.
 """
 
 CHANGELOG_URL = (
-    "https://github.com/langchain-ai/deepagents/blob/main/libs/cli/CHANGELOG.md"
+    "https://github.com/marathan24/deepagents/blob/main/libs/cli/CHANGELOG.md"
 )
 """URL for the full changelog."""
 

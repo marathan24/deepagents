@@ -2,12 +2,15 @@
 # Install deepagents-cli.
 #
 # Usage:
-#   curl -LsSf https://langch.in/gh-da-cli | bash
+#   curl -LsSf https://raw.githubusercontent.com/marathan24/deepagents/main/libs/cli/scripts/install.sh | bash
 #
 # Environment variables:
 #   DEEPAGENTS_EXTRAS  — comma-separated pip extras, e.g. "ollama",
 #                        "ollama,groq", or "daytona"
 #                        (see pyproject.toml for available extras)
+#   DEEPAGENTS_GIT_URL — Git URL to install from
+#                        (default: git+https://github.com/marathan24/deepagents.git)
+#   DEEPAGENTS_GIT_REF — Git ref to install from (default: main)
 #   DEEPAGENTS_PYTHON  — Python version to use (default: 3.13)
 #   DEEPAGENTS_SKIP_OPTIONAL — set to 1 to skip optional tool checks
 #   UV_BIN             — path to uv binary (auto-detected if unset)
@@ -185,8 +188,15 @@ prompt_yn() {
 # Config
 # ---------------------------------------------------------------------------
 EXTRAS="${DEEPAGENTS_EXTRAS:-}"
+GIT_URL="${DEEPAGENTS_GIT_URL:-git+https://github.com/marathan24/deepagents.git}"
+GIT_REF="${DEEPAGENTS_GIT_REF:-main}"
 PYTHON_VERSION="${DEEPAGENTS_PYTHON:-3.13}"
 SKIP_OPTIONAL="${DEEPAGENTS_SKIP_OPTIONAL:-0}"
+
+if [[ "$GIT_URL" =~ [[:space:]] ]] || [[ "$GIT_REF" =~ [[:space:]] ]]; then
+  log_error "DEEPAGENTS_GIT_URL and DEEPAGENTS_GIT_REF must not contain whitespace."
+  exit 1
+fi
 
 # Validate and normalize extras: accept bare CSV, wrap in brackets for pip
 if [[ -n "$EXTRAS" ]]; then
@@ -251,7 +261,11 @@ fi
 # ---------------------------------------------------------------------------
 # Install deepagents-cli
 # ---------------------------------------------------------------------------
-PACKAGE="deepagents-cli${EXTRAS}"
+PACKAGE="deepagents-cli${EXTRAS} @ ${GIT_URL}@${GIT_REF}#subdirectory=libs/cli"
+# Keep CLI package metadata publishable, but force the tool environment to
+# resolve the SDK from the same fork/ref as the CLI.
+SDK_PACKAGE="deepagents @ ${GIT_URL}@${GIT_REF}#subdirectory=libs/deepagents"
+PACKAGE_DISPLAY="deepagents-cli${EXTRAS} from ${GIT_URL}@${GIT_REF}"
 
 # Capture pre-install version (if any) for messaging
 PRE_VERSION=""
@@ -262,13 +276,13 @@ elif [ -x "${HOME}/.local/bin/deepagents" ]; then
 fi
 
 if [ -n "$PRE_VERSION" ]; then
-  log_info "deepagents-cli ${PRE_VERSION} found — checking for updates..."
+  log_info "deepagents-cli ${PRE_VERSION} found — reinstalling ${PACKAGE_DISPLAY}..."
 else
-  log_info "Installing ${PACKAGE}..."
+  log_info "Installing ${PACKAGE_DISPLAY}..."
 fi
 
-if ! "$UV_BIN" tool install -U --python "$PYTHON_VERSION" "$PACKAGE"; then
-  log_error "Failed to install ${PACKAGE}. See errors above."
+if ! "$UV_BIN" tool install -U --python "$PYTHON_VERSION" --with "$SDK_PACKAGE" "$PACKAGE"; then
+  log_error "Failed to install ${PACKAGE_DISPLAY}. See errors above."
   log_error "Common fixes: check your network, try a different Python version (DEEPAGENTS_PYTHON=3.12), or install manually."
   exit 1
 fi
