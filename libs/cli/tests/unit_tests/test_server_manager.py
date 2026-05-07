@@ -210,6 +210,8 @@ class TestWritePyproject:
         content = (tmp_path / "pyproject.toml").read_text()
 
         assert '"deepagents-cli @ file://' in content
+        assert '"sentence-transformers>=3,<6"' in content
+        assert '"faiss-cpu>=1.8,<2"' in content
         assert "langgraph-cli[inmem]" not in content
 
 

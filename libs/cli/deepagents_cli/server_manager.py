@@ -174,6 +174,9 @@ version = "0.0.1"
 requires-python = ">=3.11"
 dependencies = [
     "deepagents-cli @ file://{cli_dir}",
+    "faiss-cpu>=1.8,<2",
+    "numpy>=1.24,<3",
+    "sentence-transformers>=3,<6",
 ]
 
 [build-system]
