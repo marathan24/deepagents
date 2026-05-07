@@ -69,6 +69,7 @@ from deepagents_cli.local_context import (
     _ExecutableBackend,
 )
 from deepagents_cli.project_utils import ProjectContext, get_server_project_context
+from deepagents_cli.remote_content import RemoteContentCompatibilityMiddleware
 from deepagents_cli.subagents import list_subagents
 from deepagents_cli.unicode_security import (
     check_url_safety,
@@ -1210,6 +1211,10 @@ def create_cli_agent(
         agent_middleware.append(
             LocalContextMiddleware(backend=backend, mcp_server_info=mcp_server_info)
         )
+
+    # Normalize SDK-native image blocks into the OpenAI-style content blocks
+    # accepted by LangGraph's remote stream serializer.
+    agent_middleware.append(RemoteContentCompatibilityMiddleware())
 
     # Tool retrieval rewrites call_retrieved_tool into the selected native tool
     # before shell allow-list and HITL middleware evaluate the call.

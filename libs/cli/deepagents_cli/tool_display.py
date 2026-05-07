@@ -266,6 +266,15 @@ def _format_content_block(block: dict) -> str:
         size_kb = len(b64) * 3 // 4 // 1024  # approximate decoded size
         mime = block.get("mime_type", "file")
         return f"[File: {mime}, ~{size_kb}KB]"
+    if block.get("type") == "image_url":
+        image_url = block.get("image_url")
+        if isinstance(image_url, dict):
+            url = image_url.get("url")
+            if isinstance(url, str) and url.startswith("data:"):
+                header, _, encoded = url.partition(",")
+                size_kb = len(encoded) * 3 // 4 // 1024
+                mime = header.removeprefix("data:").split(";", 1)[0] or "image"
+                return f"[Image: {mime}, ~{size_kb}KB]"
     try:
         # Preserve non-ASCII characters (CJK, emoji, etc.) instead of \uXXXX escapes
         return json.dumps(block, ensure_ascii=False)
