@@ -29,6 +29,7 @@ from langchain_core.messages import BaseMessage, ToolMessage
 from langchain_core.tools import BaseTool, StructuredTool
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.types import Command
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ DEFAULT_CACHE_DIR = Path.home() / ".deepagents" / "cache" / "tool_retrieval"
 DEFAULT_MODEL_CACHE_DIR = DEFAULT_CACHE_DIR / "models"
 DEFAULT_INDEX_BACKEND = "faiss"
 DEFAULT_INDEX_TYPE = "flat_ip"
-DEFAULT_TOP_K = 3
+DEFAULT_TOP_K = 5
 DEFAULT_MAX_VISIBLE_TOOLS = 16
 DEFAULT_PLATFORM = "cli"
 
@@ -51,10 +52,12 @@ TOOL_RETRIEVAL_SYSTEM_PROMPT = (
     "describing the needed capability or next action. The retrieval tool will "
     "return matching native tool schemas for the current user turn; after it "
     "returns, call `call_retrieved_tool` with `name` set to a returned tool name "
-    "and `arguments` matching that tool's schema. If a suitable tool was already "
-    "retrieved in this user turn, call it through `call_retrieved_tool` instead "
-    "of calling `retrieve_tools` again. Do not guess hidden tool names or arguments "
-    "before retrieving them."
+    "and `arguments` set to an object matching that native tool's schema. The "
+    "wrapper call must be shaped exactly like "
+    '{"name": "read_file", "arguments": {"file_path": "/absolute/path"}}. '
+    "Never put native tool arguments at the top level of `call_retrieved_tool`. "
+    "If a suitable tool was already retrieved in this user turn, call it through "
+    "`call_retrieved_tool` instead of calling `retrieve_tools` again."
 )
 
 
@@ -110,6 +113,34 @@ Embedder = Callable[[list[str], dict[str, Any]], Any]
 
 _MODEL_CACHE: dict[tuple[str, str, str, str, bool], Any] = {}
 _MODEL_CACHE_LOCK = threading.Lock()
+
+
+class _RetrieveToolsInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(
+        ...,
+        description=(
+            "Concise description of the needed capability or next action, "
+            "for example 'read project files' or 'run shell commands'."
+        ),
+    )
+
+
+class _CallRetrievedToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(
+        ...,
+        description="Name of a tool returned by the latest retrieve_tools call.",
+    )
+    arguments: dict[str, Any] = Field(
+        ...,
+        description=(
+            "Arguments for the retrieved tool, matching the parameters schema "
+            "returned by retrieve_tools."
+        ),
+    )
 
 
 def default_tool_retrieval_config() -> dict[str, Any]:
@@ -977,6 +1008,7 @@ def _make_retrieve_tools_tool() -> StructuredTool:
     return StructuredTool.from_function(
         retrieve_tools,
         name=RETRIEVE_TOOLS_NAME,
+        args_schema=_RetrieveToolsInput,
         description=(
             "Retrieve native Deep Agents tool schemas for the current user turn. "
             "Use this before calling call_retrieved_tool."
@@ -1000,6 +1032,7 @@ def _make_call_retrieved_tool() -> StructuredTool:
     return StructuredTool.from_function(
         call_retrieved_tool,
         name=CALL_RETRIEVED_TOOL_NAME,
+        args_schema=_CallRetrievedToolInput,
         description=(
             "Call a native Deep Agents tool returned by retrieve_tools. "
             "The name must match one of the latest retrieved tool schemas."
@@ -1037,7 +1070,9 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
             merged.update(config)
         self.config = merged
         self.platform = platform
-        self.tools = [_make_retrieve_tools_tool(), _make_call_retrieved_tool()]
+        self._retrieve_tools_tool = _make_retrieve_tools_tool()
+        self._call_retrieved_tool = _make_call_retrieved_tool()
+        self.tools = [self._retrieve_tools_tool, self._call_retrieved_tool]
         self.fallback_tools = list(fallback_tools or [])
         self._select_fn = select_fn
         self._load_index_fn = load_index_fn
@@ -1045,9 +1080,15 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         self._index_cache: dict[str, ToolRetrievalIndex] = {}
         self._lock = threading.RLock()
 
-    def _state_for_runtime(self, runtime: Any) -> _ThreadRetrievalState:
+    def _state_for_runtime(
+        self, runtime: Any, *, turn_key: str | None = None
+    ) -> _ThreadRetrievalState:
         thread_key = _thread_key_from_runtime(runtime)
         with self._lock:
+            if thread_key == "default" and turn_key:
+                for state in self._states.values():
+                    if state.turn_key == turn_key:
+                        return state
             state = self._states.get(thread_key)
             if state is None:
                 state = _ThreadRetrievalState(records_by_name={}, retrieved_names=[])
@@ -1057,6 +1098,16 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
     def _fallback_records_by_name(self) -> dict[str, _ToolRecord]:
         records = _tool_records(self.fallback_tools)
         return {record.name: record for record in records}
+
+    def _retrieval_system_prompt(self, system_prompt: str | None) -> str:
+        system_prompt = system_prompt or ""
+        if TOOL_RETRIEVAL_SYSTEM_PROMPT in system_prompt:
+            return system_prompt
+        return (
+            f"{system_prompt}\n\n{TOOL_RETRIEVAL_SYSTEM_PROMPT}"
+            if system_prompt
+            else TOOL_RETRIEVAL_SYSTEM_PROMPT
+        )
 
     def _ensure_index(self, records: Sequence[_ToolRecord]) -> ToolRetrievalIndex:
         schemas = [record.schema for record in records]
@@ -1083,20 +1134,25 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         self, request: ModelRequest[ContextT]
     ) -> ModelRequest[ContextT]:
         records = _tool_records(request.tools or [])
-        if not records and self.fallback_tools:
-            records = _tool_records(self.fallback_tools)
+        if self.fallback_tools:
+            fallback_records = _tool_records(self.fallback_tools)
+            if not records or len(fallback_records) > len(records):
+                records = fallback_records
         if not records:
             return request.override(tools=[])
-        if len(records) <= _top_k(self.config):
-            return request.override(tools=[record.tool for record in records])
 
-        state = self._state_for_runtime(request.runtime)
         turn_key = _latest_user_turn_key(request.messages)
+        state = self._state_for_runtime(request.runtime, turn_key=turn_key)
         with self._lock:
             if state.turn_key != turn_key:
                 state.turn_key = turn_key
                 state.retrieved_names = []
             state.records_by_name = {record.name: record for record in records}
+
+        system_prompt = self._retrieval_system_prompt(request.system_prompt)
+
+        if len(records) <= _top_k(self.config):
+            return request.override(tools=[record.tool for record in records])
 
         try:
             self._ensure_index(records)
@@ -1104,13 +1160,6 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
             msg = f"tool retrieval initialization failed: {exc}"
             raise RuntimeError(msg) from exc
 
-        system_prompt = request.system_prompt or ""
-        if TOOL_RETRIEVAL_SYSTEM_PROMPT not in system_prompt:
-            system_prompt = (
-                f"{system_prompt}\n\n{TOOL_RETRIEVAL_SYSTEM_PROMPT}"
-                if system_prompt
-                else TOOL_RETRIEVAL_SYSTEM_PROMPT
-            )
         return request.override(
             tools=list(self.tools),
             system_prompt=system_prompt,
@@ -1135,6 +1184,16 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         """Async variant of `wrap_model_call`."""
         prepared = await asyncio.to_thread(self._prepare_request, request)
         return await handler(prepared)
+
+    @staticmethod
+    def _tool_request_turn_key(request: ToolCallRequest) -> str | None:
+        state = getattr(request, "state", None)
+        if not isinstance(state, dict):
+            return None
+        messages = state.get("messages")
+        if not isinstance(messages, Sequence):
+            return None
+        return _latest_user_turn_key(messages)
 
     def _tool_message(
         self,
@@ -1170,7 +1229,13 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         return item
 
     def _retrieve_tools(self, request: ToolCallRequest) -> ToolMessage:
-        state = self._state_for_runtime(request.runtime)
+        state = self._state_for_runtime(
+            request.runtime, turn_key=self._tool_request_turn_key(request)
+        )
+        turn_key = self._tool_request_turn_key(request)
+        if turn_key and state.turn_key != turn_key:
+            with self._lock:
+                state.turn_key = turn_key
         args = request.tool_call.get("args") or {}
         query = str(args.get("query") or "").strip()
         if not query:
@@ -1249,8 +1314,9 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
                     "message": (
                         "These native tool schemas are available for this user turn. "
                         "Call call_retrieved_tool with name set to one of retrieved_tools "
-                        "and arguments matching that tool's parameters. Call retrieve_tools "
-                        "again only when you need a different capability."
+                        "and arguments matching that tool's parameters. The call shape is "
+                        '{"name": "tool_name", "arguments": { ...native args... }}. '
+                        "Call retrieve_tools again only when you need a different capability."
                     ),
                 },
             )
@@ -1294,7 +1360,16 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
                 ),
             )
 
+        has_arguments = "arguments" in args
         raw_arguments = args.get("arguments", {})
+        if not has_arguments:
+            native_args = {
+                key: value
+                for key, value in args.items()
+                if key not in {"name", "arguments"}
+            }
+            if native_args:
+                return requested_name, native_args, None
         if raw_arguments is None:
             return requested_name, {}, None
         if isinstance(raw_arguments, dict):
@@ -1337,7 +1412,9 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         if error is not None:
             return None, error
 
-        state = self._state_for_runtime(request.runtime)
+        state = self._state_for_runtime(
+            request.runtime, turn_key=self._tool_request_turn_key(request)
+        )
         retrieved_names = list(state.retrieved_names or [])
         if not retrieved_names:
             return (

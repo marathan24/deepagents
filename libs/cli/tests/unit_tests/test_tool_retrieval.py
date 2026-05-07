@@ -300,6 +300,47 @@ def test_retrieve_tools_uses_fallback_catalog_when_state_is_empty() -> None:
     assert "read_file" in middleware._states["thread-1"].records_by_name
 
 
+def test_retrieve_tools_records_user_turn_key_from_tool_state() -> None:
+    native_tool = StructuredTool.from_function(
+        _read_file, name="read_file", description="Read a file"
+    )
+
+    def select(
+        _tools: list[dict[str, object]],
+        _query: str,
+        _config: dict[str, object],
+        **_kwargs: object,
+    ) -> ToolRetrievalResult:
+        return ToolRetrievalResult(
+            selected_tools=[],
+            selected_names=["read_file"],
+            scores={"read_file": 0.9},
+        )
+
+    middleware = ToolRetrievalMiddleware(
+        fallback_tools=[native_tool],
+        select_fn=select,
+        load_index_fn=lambda *_args, **_kwargs: ToolRetrievalIndex(
+            index=object(),
+            metadata={},
+            entries=[{"name": "read_file"}],
+            vector_dimensions=2,
+            index_path=Path("/tmp/index.faiss"),
+            metadata_path=Path("/tmp/index.meta.json"),
+        ),
+    )
+    request = _tool_request("retrieve_tools", {"query": "read files"})
+    request.state["messages"] = [HumanMessage("read a file", id="user-1")]
+
+    result = middleware.wrap_tool_call(
+        request, lambda _request: pytest.fail("handler should not run")
+    )
+    payload = json.loads(result.content)
+
+    assert payload["success"] is True
+    assert middleware._states["thread-1"].turn_key == "user-1"
+
+
 def test_call_retrieved_tool_dispatches_only_latest_retrieved_tool() -> None:
     native_tool = StructuredTool.from_function(
         _echo_value, name="echo_value", description="Echo a value"
@@ -320,6 +361,35 @@ def test_call_retrieved_tool_dispatches_only_latest_retrieved_tool() -> None:
         assert native_request.tool_call["name"] == "echo_value"
         assert native_request.tool_call["args"] == {"value": "ok"}
         assert native_request.tool is native_tool
+        return ToolMessage(
+            content="ok", name="echo_value", tool_call_id=native_request.tool_call["id"]
+        )
+
+    result = middleware.wrap_tool_call(request, handler)
+
+    assert result.content == "ok"
+
+
+def test_call_retrieved_tool_accepts_top_level_native_arguments() -> None:
+    """Recover when a model flattens native args into the wrapper call."""
+    native_tool = StructuredTool.from_function(
+        _echo_value, name="echo_value", description="Echo a value"
+    )
+    middleware = ToolRetrievalMiddleware()
+    record = next(record for record in _tool_records([native_tool]))
+    middleware._states["thread-1"] = _ThreadRetrievalState(
+        turn_key="user-1",
+        records_by_name={"echo_value": record},
+        retrieved_names=["echo_value"],
+    )
+    request = _tool_request(
+        "call_retrieved_tool",
+        {"name": "echo_value", "value": "ok"},
+    )
+
+    def handler(native_request: ToolCallRequest) -> ToolMessage:
+        assert native_request.tool_call["name"] == "echo_value"
+        assert native_request.tool_call["args"] == {"value": "ok"}
         return ToolMessage(
             content="ok", name="echo_value", tool_call_id=native_request.tool_call["id"]
         )
