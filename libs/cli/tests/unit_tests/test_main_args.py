@@ -365,6 +365,43 @@ class TestMaxTurnsArgument:
         assert exc_info.value.code == 2
 
 
+class TestNoRetrievalToolCallArgument:
+    """Tests for --no-retrieval-tool-call argument parsing and forwarding."""
+
+    def test_parses_false_by_default(self, mock_argv: MockArgvType) -> None:
+        with mock_argv():
+            parsed = parse_args()
+            assert parsed.no_retrieval_tool_call is False
+
+    def test_parses_true_when_set(self, mock_argv: MockArgvType) -> None:
+        with mock_argv("--no-retrieval-tool-call", "-n", "task"):
+            parsed = parse_args()
+            assert parsed.no_retrieval_tool_call is True
+
+    def test_forwarded_to_run_non_interactive(self) -> None:
+        from deepagents_cli.main import cli_main
+
+        mock_stdin = MagicMock()
+        mock_stdin.isatty.return_value = True
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["deepagents", "-n", "do the thing", "--no-retrieval-tool-call"],
+            ),
+            patch.object(sys, "stdin", mock_stdin),
+            patch("deepagents_cli.main.check_optional_tools", return_value=[]),
+            patch(
+                "deepagents_cli.non_interactive.run_non_interactive",
+                new_callable=AsyncMock,
+                return_value=0,
+            ) as mock_run,
+            pytest.raises(SystemExit),
+        ):
+            cli_main()
+        assert mock_run.await_args.kwargs["no_retrieval_tool_call"] is True  # type: ignore[union-attr]
+
+
 class TestModelParamsArgument:
     """Tests for --model-params argument parsing."""
 

@@ -294,6 +294,50 @@ class TestSandboxTypeForwarding:
         _, kwargs = mock_start_server.call_args
         assert kwargs["sandbox_type"] == "modal"
 
+    async def test_no_retrieval_tool_call_passed_to_server(self) -> None:
+        """run_non_interactive should forward tool retrieval disabling."""
+        mock_agent = MagicMock()
+        mock_agent.astream = MagicMock(return_value=_async_iter([]))
+        mock_server_proc = MagicMock()
+
+        with (
+            patch(
+                "deepagents_cli.non_interactive.create_model",
+                return_value=ModelResult(
+                    model=MagicMock(),
+                    model_name="test-model",
+                    provider="test",
+                ),
+            ),
+            patch(
+                "deepagents_cli.non_interactive.generate_thread_id",
+                return_value="test-thread",
+            ),
+            patch(
+                "deepagents_cli.non_interactive.settings",
+            ) as mock_settings,
+            patch(
+                "deepagents_cli.non_interactive.build_langsmith_thread_url",
+                return_value=None,
+            ),
+            patch(
+                "deepagents_cli.server_manager.start_server_and_get_agent",
+                new_callable=AsyncMock,
+                return_value=(mock_agent, mock_server_proc, None),
+            ) as mock_start_server,
+        ):
+            mock_settings.shell_allow_list = None
+            mock_settings.has_tavily = False
+            mock_settings.model_name = None
+
+            await run_non_interactive(
+                message="test task",
+                no_retrieval_tool_call=True,
+            )
+
+        _, kwargs = mock_start_server.call_args
+        assert kwargs["no_retrieval_tool_call"] is True
+
 
 class TestQuietMode:
     """Tests for --quiet flag in run_non_interactive."""

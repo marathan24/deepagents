@@ -907,6 +907,7 @@ async def run_non_interactive(
     no_mcp: bool = False,
     trust_project_mcp: bool = False,
     max_turns: int | None = None,
+    no_retrieval_tool_call: bool = False,
 ) -> int:
     """Run a single task non-interactively and exit.
 
@@ -963,6 +964,8 @@ async def run_non_interactive(
             silently skipped.
         max_turns: Optional cap on total agentic turns. When `None`, the
             internal safety default applies.
+        no_retrieval_tool_call: Disable CLI tool retrieval and expose the full
+            native tool catalog.
 
     Returns:
         Exit code: 0 for success, 1 for error, 124 when the `--max-turns`
@@ -1136,6 +1139,7 @@ async def run_non_interactive(
             mcp_config_path=mcp_config_path,
             no_mcp=no_mcp,
             trust_project_mcp=trust_project_mcp,
+            no_retrieval_tool_call=no_retrieval_tool_call,
             interactive=False,
         ) as (agent, _server_proc):
             # Collect MCP preload result (ran concurrently with server startup)

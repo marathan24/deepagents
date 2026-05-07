@@ -257,6 +257,7 @@ async def start_server_and_get_agent(
     mcp_config_path: str | None = None,
     no_mcp: bool = False,
     trust_project_mcp: bool | None = None,
+    no_retrieval_tool_call: bool = False,
     interactive: bool = True,
     host: str = "127.0.0.1",
     port: int = 2024,
@@ -278,6 +279,7 @@ async def start_server_and_get_agent(
         mcp_config_path: Path to MCP config.
         no_mcp: Disable MCP.
         trust_project_mcp: Trust project MCP servers.
+        no_retrieval_tool_call: Disable CLI tool retrieval.
         interactive: Whether the agent is interactive.
         host: Server host.
         port: Server port.
@@ -318,6 +320,7 @@ async def start_server_and_get_agent(
         mcp_config_path=mcp_config_path,
         no_mcp=no_mcp,
         trust_project_mcp=trust_project_mcp,
+        no_retrieval_tool_call=no_retrieval_tool_call,
         interactive=interactive,
     )
     _apply_server_config(config)
@@ -364,6 +367,7 @@ async def server_session(
     mcp_config_path: str | None = None,
     no_mcp: bool = False,
     trust_project_mcp: bool | None = None,
+    no_retrieval_tool_call: bool = False,
     interactive: bool = True,
     host: str = "127.0.0.1",
     port: int = 2024,
@@ -388,6 +392,7 @@ async def server_session(
         mcp_config_path: Path to MCP config.
         no_mcp: Disable MCP.
         trust_project_mcp: Trust project MCP servers.
+        no_retrieval_tool_call: Disable CLI tool retrieval.
         interactive: Whether the agent is interactive.
         host: Server host.
         port: Server port.
@@ -413,6 +418,7 @@ async def server_session(
             mcp_config_path=mcp_config_path,
             no_mcp=no_mcp,
             trust_project_mcp=trust_project_mcp,
+            no_retrieval_tool_call=no_retrieval_tool_call,
             interactive=interactive,
             host=host,
             port=port,

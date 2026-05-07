@@ -930,6 +930,7 @@ def create_cli_agent(
     cwd: str | Path | None = None,
     project_context: ProjectContext | None = None,
     async_subagents: list[AsyncSubAgent] | None = None,
+    no_retrieval_tool_call: bool = False,
 ) -> tuple[Pregel, CompositeBackend]:
     """Create a CLI-configured agent with flexible options.
 
@@ -992,6 +993,8 @@ def create_cli_agent(
         async_subagents: Remote LangGraph deployments to expose as async subagent tools.
 
             Loaded from `[async_subagents]` in `config.toml` or passed directly.
+        no_retrieval_tool_call: Disable embedding-backed retrieval helper tools
+            and expose the full native tool catalog to the model.
 
     Returns:
         2-tuple of `(agent_graph, backend)`
@@ -1207,6 +1210,13 @@ def create_cli_agent(
         agent_middleware.append(
             LocalContextMiddleware(backend=backend, mcp_server_info=mcp_server_info)
         )
+
+    # Tool retrieval rewrites call_retrieved_tool into the selected native tool
+    # before shell allow-list and HITL middleware evaluate the call.
+    if not no_retrieval_tool_call:
+        from deepagents_cli.tool_retrieval import ToolRetrievalMiddleware
+
+        agent_middleware.append(ToolRetrievalMiddleware(platform="cli"))
 
     # Add shell allow-list middleware when interrupt_shell_only is active.
     shell_middleware_added = False

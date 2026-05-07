@@ -135,6 +135,9 @@ def show_help() -> None:
     )
     console.print("  --no-mcp                   Disable all MCP tool loading")
     console.print(
+        "  --no-retrieval-tool-call   Disable tool retrieval and expose all tools"
+    )
+    console.print(
         "  --trust-project-mcp        Trust project MCP configs (skip approval prompt)"
     )
     console.print("  -n, --non-interactive MSG  Run a single task and exit")

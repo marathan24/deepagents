@@ -854,6 +854,11 @@ def parse_args() -> argparse.Namespace:
         help="Disable all MCP tool loading (skip auto-discovery and explicit config)",
     )
     parser.add_argument(
+        "--no-retrieval-tool-call",
+        action="store_true",
+        help="Disable embedding-backed tool retrieval and expose all tools",
+    )
+    parser.add_argument(
         "--trust-project-mcp",
         action="store_true",
         help="Trust project-level MCP configs with stdio servers "
@@ -938,6 +943,7 @@ async def run_textual_cli_async(
     mcp_config_path: str | None = None,
     no_mcp: bool = False,
     trust_project_mcp: bool | None = None,
+    no_retrieval_tool_call: bool = False,
 ) -> "AppResult":
     """Run the Textual CLI interface (async version).
 
@@ -982,6 +988,7 @@ async def run_textual_cli_async(
         trust_project_mcp: Controls project-level stdio server trust.
 
             `True` to allow, `False` to deny, `None` to check trust store.
+        no_retrieval_tool_call: Disable CLI tool retrieval.
 
     Returns:
         An `AppResult` with the return code and final thread ID.
@@ -1041,6 +1048,7 @@ async def run_textual_cli_async(
         "mcp_config_path": mcp_config_path,
         "no_mcp": no_mcp,
         "trust_project_mcp": trust_project_mcp,
+        "no_retrieval_tool_call": no_retrieval_tool_call,
         "interactive": True,
     }
 
@@ -1094,6 +1102,7 @@ async def _run_acp_cli_async(
     mcp_config_path: str | None = None,
     no_mcp: bool = False,
     trust_project_mcp: bool | None = None,
+    no_retrieval_tool_call: bool = False,
 ) -> int:
     """Run ACP server mode and return a process exit code.
 
@@ -1107,6 +1116,7 @@ async def _run_acp_cli_async(
         mcp_config_path: Optional path to MCP servers JSON configuration file.
         no_mcp: Disable all MCP tool loading.
         trust_project_mcp: Controls project-level stdio server trust.
+        no_retrieval_tool_call: Disable CLI tool retrieval.
 
     Returns:
         Exit code for ACP mode.
@@ -1173,6 +1183,7 @@ async def _run_acp_cli_async(
             mcp_server_info=mcp_server_info,
             checkpointer=InMemorySaver(),
             async_subagents=async_subagents,
+            no_retrieval_tool_call=no_retrieval_tool_call,
         )
     except Exception as exc:
         sys.stderr.write(f"Error: failed to create agent: {exc}\n")
@@ -1608,6 +1619,9 @@ def cli_main() -> None:
                     mcp_config_path=getattr(args, "mcp_config", None),
                     no_mcp=getattr(args, "no_mcp", False),
                     trust_project_mcp=getattr(args, "trust_project_mcp", False),
+                    no_retrieval_tool_call=getattr(
+                        args, "no_retrieval_tool_call", False
+                    ),
                 )
             )
             sys.exit(exit_code)
@@ -1975,6 +1989,9 @@ def cli_main() -> None:
                     no_mcp=getattr(args, "no_mcp", False),
                     trust_project_mcp=getattr(args, "trust_project_mcp", False),
                     max_turns=getattr(args, "max_turns", None),
+                    no_retrieval_tool_call=getattr(
+                        args, "no_retrieval_tool_call", False
+                    ),
                 )
             )
             sys.exit(exit_code)
@@ -2039,6 +2056,9 @@ def cli_main() -> None:
                         mcp_config_path=getattr(args, "mcp_config", None),
                         no_mcp=getattr(args, "no_mcp", False),
                         trust_project_mcp=mcp_trust_decision,
+                        no_retrieval_tool_call=getattr(
+                            args, "no_retrieval_tool_call", False
+                        ),
                     )
                 )
                 return_code = result.return_code

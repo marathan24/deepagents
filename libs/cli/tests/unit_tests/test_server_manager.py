@@ -49,6 +49,7 @@ class TestServerConfigRoundTrip:
             mcp_config_path="/home/user/.mcp.json",
             no_mcp=True,
             trust_project_mcp=True,
+            no_retrieval_tool_call=True,
         )
         env_dict = original.to_env()
         with patch.dict(os.environ, {}, clear=True):
@@ -114,6 +115,7 @@ class TestApplyServerConfig:
             no_mcp=False,
             trust_project_mcp=None,
             interactive=True,
+            no_retrieval_tool_call=True,
         )
 
         with patch.dict(os.environ, {}, clear=False):
