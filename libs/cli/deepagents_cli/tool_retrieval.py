@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import hashlib
 import json
@@ -350,7 +351,7 @@ def _get_sentence_transformer_model(config: dict[str, Any]) -> Any:
         except Exception as exc:  # pragma: no cover - depends on install env
             msg = (
                 "sentence-transformers package unavailable; install sentence-transformers "
-                "to use local tool retrieval"
+                f"to use local tool retrieval: {type(exc).__name__}: {exc}"
             )
             raise ToolRetrievalError(msg) from exc
 
@@ -1122,7 +1123,8 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         ],
     ) -> ModelResponse[ResponseT]:
         """Async variant of `wrap_model_call`."""
-        return await handler(self._prepare_request(request))
+        prepared = await asyncio.to_thread(self._prepare_request, request)
+        return await handler(prepared)
 
     def _tool_message(
         self,
@@ -1417,7 +1419,7 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         """Async variant of `wrap_tool_call`."""
         tool_name_in_call = request.tool_call["name"]
         if tool_name_in_call == RETRIEVE_TOOLS_NAME:
-            return self._retrieve_tools(request)
+            return await asyncio.to_thread(self._retrieve_tools, request)
         if tool_name_in_call == CALL_RETRIEVED_TOOL_NAME:
             native_request, error = self._native_tool_request(request)
             if error is not None:
