@@ -1076,7 +1076,7 @@ class ToolRetrievalMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         records = _tool_records(request.tools or [])
         if not records:
             return request.override(tools=[])
-        if len(records) <= _max_visible_tools(self.config, len(records)):
+        if len(records) <= _top_k(self.config):
             return request.override(tools=[record.tool for record in records])
 
         state = self._state_for_runtime(request.runtime)

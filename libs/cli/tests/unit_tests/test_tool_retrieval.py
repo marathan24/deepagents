@@ -159,7 +159,7 @@ def test_prepare_request_hides_native_tools_and_adds_guidance() -> None:
         )
 
     middleware = ToolRetrievalMiddleware(
-        config={"max_visible_tools": 1},
+        config={"max_visible_tools": 1, "top_k": 1},
         load_index_fn=load_index,
     )
     request = SimpleNamespace(
