@@ -37,7 +37,7 @@ DEFAULT_CACHE_DIR = Path.home() / ".deepagents" / "cache" / "tool_retrieval"
 DEFAULT_MODEL_CACHE_DIR = DEFAULT_CACHE_DIR / "models"
 DEFAULT_INDEX_BACKEND = "faiss"
 DEFAULT_INDEX_TYPE = "flat_ip"
-DEFAULT_TOP_K = 5
+DEFAULT_TOP_K = 3
 DEFAULT_MAX_VISIBLE_TOOLS = 16
 DEFAULT_PLATFORM = "cli"
 
