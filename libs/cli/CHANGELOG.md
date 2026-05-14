@@ -3,6 +3,13 @@
 From 0.1.0 onward, `deepagents-cli` only contains `deploy`, `dev`, and `init`.
 The coding agent (interactive TUI & headless CLI) moved to [`deepagents-code`](https://github.com/langchain-ai/deepagents/blob/main/libs/code/CHANGELOG.md).
 
+## [0.1.0](https://github.com/langchain-ai/deepagents/compare/deepagents-cli==0.0.59...deepagents-cli==0.1.0) (2026-05-14)
+
+
+### Features
+
+* **code:** port from `libs/cli` ([#3388](https://github.com/langchain-ai/deepagents/issues/3388)) ([2ac7d41](https://github.com/langchain-ai/deepagents/commit/2ac7d4153398889100d5fd163ab4a122633862b5))
+
 ## [0.0.59](https://github.com/langchain-ai/deepagents/compare/deepagents-cli==0.0.58...deepagents-cli==0.0.59) (2026-05-12)
 
 ### Bug Fixes
